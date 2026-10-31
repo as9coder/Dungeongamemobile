@@ -187,14 +187,14 @@ export function populateCamp(L, rng) {
   L.torches.push({ x: cx, y: 1.4, z: cz, color: 0xff9030, flame: cf.userData.flame, glow: cf.userData.glow, seed: 1 });
   // stations
   const st = {};
-  const mk = (id, obj, x, z, rot, label, r = 1.4) => { g.add(place(obj, x, z, rot)); const s = { id, x, z, label, obj, r: 3.2 }; st[id] = s; L.addProp({ type: 'station', id, x, z, r, solid: true }); return s; };
-  mk('missions', P.propMap(), cx, cz - 15, 0, 'Mission Map');
-  mk('smith', P.propAnvil(), cx + 14, cz - 2, -Math.PI / 2, 'Blacksmith');
-  mk('merchant', P.propStall(0x2a8a5a), cx - 14, cz - 2, Math.PI / 2, 'Merchant');
-  mk('quests', P.propBoard(), cx + 8, cz + 12, Math.PI + 0.4, 'Quest Board');
+  const mk = (id, obj, x, z, rot, label, r = 1.4) => { obj.scale.setScalar(1.3); g.add(place(obj, x, z, rot)); const s = { id, x, z, label, obj, r: 3.8 }; st[id] = s; L.addProp({ type: 'station', id, x, z, r, solid: true }); return s; };
+  mk('missions', P.propMap(), cx + 2, cz - 11.5, 0, 'Mission Map');
+  mk('smith', P.propAnvil(), cx + 11.5, cz - 3, -Math.PI / 2, 'Blacksmith');
+  mk('merchant', P.propStall(0x2a8a5a), cx - 11.5, cz - 3, Math.PI / 2, 'Merchant');
+  mk('quests', P.propBoard(), cx + 6, cz + 9.5, Math.PI + 0.4, 'Quest Board');
   L.stations = st;
   // tents / decor
-  solid(P.propTent(0xb04030), cx - 12, cz + 8, 2.0, 'tent'); solid(P.propTent(0x3060b0), cx + 15, cz + 6, 2.0, 'tent'); solid(P.propTent(0xc09030), cx - 6, cz + 15, 2.0, 'tent');
+  solid(P.propTent(0xb04030), cx - 12, cz + 6, 2.0, 'tent'); solid(P.propTent(0x3060b0), cx + 14, cz + 5, 2.0, 'tent'); solid(P.propTent(0xc09030), cx - 5, cz + 13, 2.0, 'tent');
   for (let i = 0; i < 26; i++) {
     const a = rng.range(0, TAU), d = rng.range(5, 19); const x = cx + Math.cos(a) * d, z = cz + Math.sin(a) * d;
     const ccx = Math.floor(x / CS), ccz = Math.floor(z / CS);
@@ -205,7 +205,7 @@ export function populateCamp(L, rng) {
     else if (r < 0.7) { const o = P.propBarrel(rng); stat.add(place(o, x, z)); L.addProp({ type: 'barrel', x, z, r: 0.55, solid: true }); }
     else stat.add(place(P.propFlower(rng), x, z));
   }
-  for (let i = 0; i < 110; i++) { const a = rng.range(0, TAU), d = rng.range(2, 21); const x = cx + Math.cos(a) * d, z = cz + Math.sin(a) * d; if (L.walkable(Math.floor(x / CS), Math.floor(z / CS))) stat.add(place(rng.chance(0.6) ? P.propGrass(rng) : P.propFlower(rng), x, z)); }
+  for (let i = 0; i < 70; i++) { const a = rng.range(0, TAU), d = rng.range(2, 21); const x = cx + Math.cos(a) * d, z = cz + Math.sin(a) * d; if (L.walkable(Math.floor(x / CS), Math.floor(z / CS))) stat.add(place(rng.chance(0.8) ? P.propGrass(rng) : P.propFlower(rng), x, z)); }
   // lamp posts around the edge
   for (let i = 0; i < 6; i++) {
     const a = i / 6 * TAU + 0.5, x = cx + Math.cos(a) * 9, z = cz + Math.sin(a) * 9;

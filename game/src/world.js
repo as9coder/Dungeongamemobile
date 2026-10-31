@@ -6,7 +6,7 @@ import { boxGeo, lam, part, emissiveMat } from './voxel.js';
 export const CS = 2; // world units per grid cell
 
 export const BIOMES = {
-  camp:    { id: 'camp', name: 'Adventurer Camp', sky: 0x0b1030, fog: 0x0b1030, fogD: 0.012, hemi: [0x5a6aa8, 0x1a1a2a, 0.85], sun: [0x8fa8ff, 0.7], sunDir: [-0.5, 1, 0.6], torch: 0xffa040, tex: 'meadow', wallH: 4.2, exposure: 1.0 },
+  camp:    { id: 'camp', name: 'Adventurer Camp', sky: 0x1c2858, fog: 0x1c2858, fogD: 0.009, hemi: [0x9aaae8, 0x3a3a4a, 1.25], sun: [0xc0d0ff, 1.5], sunDir: [-0.5, 1, 0.6], torch: 0xffa040, tex: 'meadow', wallH: 4.2, exposure: 1.15 },
   meadow:  { id: 'meadow', name: 'Sunlit Meadows', sky: 0x8fd0ff, fog: 0x9fd8f0, fogD: 0.010, hemi: [0xcfe8ff, 0x4a6a30, 1.05], sun: [0xfff2d0, 2.0], sunDir: [-0.5, 1, 0.45], torch: 0xffb050, tex: 'meadow', wallH: 4.0, exposure: 1.05 },
   crypt:   { id: 'crypt', name: 'Forgotten Crypt', sky: 0x0e0c16, fog: 0x14101c, fogD: 0.022, hemi: [0x7a76a8, 0x1c1620, 0.75], sun: [0xaab4ff, 0.9], sunDir: [-0.4, 1, 0.5], torch: 0xffa43c, tex: 'crypt', wallH: 3.2, exposure: 1.1 },
   sands:   { id: 'sands', name: 'Sunscorched Sanctum', sky: 0xf0c080, fog: 0xe4b878, fogD: 0.014, hemi: [0xffe6b8, 0x8a6a3a, 1.0], sun: [0xfff0c0, 2.1], sunDir: [-0.6, 1, 0.3], torch: 0x66d8ff, tex: 'sands', wallH: 3.4, exposure: 1.05 },
@@ -140,37 +140,48 @@ function corridor(L, ax, az, bx, bz, rng, wide = 3) {
   if (rng.chance(0.5)) { h(ax, bx, az); v(az, bz, bx); } else { v(az, bz, ax); h(ax, bx, bz); }
 }
 
-export function generateDungeon(rng, { biome, size = 'medium', bossRoom = true }) {
-  const dims = { small: [44, 44, 6], medium: [56, 56, 8], large: [66, 66, 10] }[size];
+export function generateDungeon(rng, opts) {
+  for (let attempt = 0; attempt < 12; attempt++) {
+    const L = generateDungeonOnce(rng, opts);
+    if (opts.bossRoom === false) return L;
+    if (L.bossRoom && L.rooms.length >= 5) return L;
+  }
+  return generateDungeonOnce(rng, Object.assign({}, opts, { size: 'medium' }));
+}
+
+function generateDungeonOnce(rng, { biome, size = 'medium', bossRoom = true }) {
+  const dims = { small: [52, 52, 6], medium: [62, 62, 8], large: [74, 74, 10] }[size];
   const [W, H, N] = dims;
   const L = new Level(W, H, biome);
   const rooms = [];
-  const tryPlace = (rw, rh, margin = 3) => {
-    for (let a = 0; a < 80; a++) {
+  const tryPlace = (rw, rh, margin = 3, scoreFn = null, tries = 80) => {
+    let best = null, bs = -1e9;
+    for (let a = 0; a < tries; a++) {
       const x = rng.int(3, W - rw - 3), z = rng.int(3, H - rh - 3);
       if (rooms.some((r) => x < r.x1 + margin && x + rw - 1 > r.x0 - margin && z < r.z1 + margin && z + rh - 1 > r.z0 - margin)) continue;
-      return { x0: x, z0: z, x1: x + rw - 1, z1: z + rh - 1 };
+      const c = { x0: x, z0: z, x1: x + rw - 1, z1: z + rh - 1 };
+      if (!scoreFn) return c;
+      const sc = scoreFn(c); if (sc > bs) { bs = sc; best = c; }
     }
-    return null;
+    return best;
   };
-  // start room first
-  const sr = tryPlace(9, 9); rooms.push(Object.assign(sr, { type: 'start' }));
-  for (let i = 0; i < N * 3 && rooms.length < N; i++) {
-    const rw = rng.int(7, 13), rh = rng.int(7, 13); const r = tryPlace(rw, rh); if (r) rooms.push(Object.assign(r, { type: 'combat' }));
-  }
+  // boss room first (guaranteed), then a start room as far away as possible
   let boss = null;
-  if (bossRoom) { boss = tryPlace(17, 17, 3); if (boss) { boss.type = 'boss'; } }
-  // order by chain from start
-  const order = [rooms[0]]; const rest = rooms.slice(1);
+  if (bossRoom) { boss = tryPlace(17, 17, 3); if (!boss) return L; boss.type = 'boss'; rooms.push(boss); }
+  const bc = boss ? [(boss.x0 + boss.x1) / 2, (boss.z0 + boss.z1) / 2] : [W / 2, H / 2];
+  const sr = tryPlace(9, 9, 3, (c) => Math.hypot((c.x0 + c.x1) / 2 - bc[0], (c.z0 + c.z1) / 2 - bc[1]), 60);
+  if (!sr) return L; sr.type = 'start'; rooms.push(sr);
+  for (let i = 0; i < N * 4 && rooms.length < N + (boss ? 1 : 0); i++) {
+    const rw = rng.int(7, 13), rh = rng.int(7, 13); const r = tryPlace(rw, rh); if (r) { r.type = 'combat'; rooms.push(r); }
+  }
+  // order by chain from start; boss last
+  const order = [sr]; const rest = rooms.filter((r) => r !== sr && r !== boss);
   while (rest.length) {
     const last = order[order.length - 1]; let bi = 0, bd = 1e9;
     rest.forEach((r, i) => { const d = Math.hypot((r.x0 + r.x1) / 2 - (last.x0 + last.x1) / 2, (r.z0 + r.z1) / 2 - (last.z0 + last.z1) / 2); if (d < bd) { bd = d; bi = i; } });
     order.push(rest.splice(bi, 1)[0]);
   }
-  if (boss) {
-    // the boss room should be near the end of chain: connect from last room
-    order.push(boss);
-  }
+  if (boss) order.push(boss);
   order.forEach((r, i) => {
     r.id = i; r.cx = (r.x0 + r.x1) >> 1; r.cz = (r.z0 + r.z1) >> 1; r.w = r.x1 - r.x0 + 1; r.h = r.z1 - r.z0 + 1;
     if (r.type === 'boss') { carveRect(L, r.x0, r.z0, r.x1, r.z1, T_FLOOR, i); }
@@ -178,31 +189,26 @@ export function generateDungeon(rng, { biome, size = 'medium', bossRoom = true }
     else carveRect(L, r.x0, r.z0, r.x1, r.z1, T_FLOOR, i);
   });
   for (let i = 0; i < order.length - 1; i++) corridor(L, order[i].cx, order[i].cz, order[i + 1].cx, order[i + 1].cz, rng, 3);
-  // extra loops
   for (let k = 0; k < 2; k++) { const a = rng.pick(order.slice(0, -1)), b = rng.pick(order.slice(0, -1)); if (a !== b) corridor(L, a.cx, a.cz, b.cx, b.cz, rng, 2); }
-  // assign roles
   const mids = order.filter((r) => r.type === 'combat');
   rng.shuffle(mids);
   mids.forEach((r, i) => { r.type = i % 4 === 0 ? 'treasure' : 'combat'; });
   L.rooms = order; L.bossRoom = boss;
-  // keep corridors' room id unset; mark corridor tiles near rooms stay -1
   L.start = L.cellCenter(order[0].cx, order[0].cz);
-  // decorate rooms: pillars / liquid
   for (const r of order) {
     if (r.type === 'start') continue;
     const style = rng.int(0, 4);
-    if (r.w >= 9 && r.h >= 9 && style === 0) { // 4 pillars
+    if (r.w >= 9 && r.h >= 9 && style === 0) {
       for (const [px, pz] of [[r.cx - 3, r.cz - 3], [r.cx + 3, r.cz - 3], [r.cx - 3, r.cz + 3], [r.cx + 3, r.cz + 3]]) if (L.room[L.idx(px, pz)] === r.id) L.grid[L.idx(px, pz)] = T_PILLAR;
-    } else if (r.w >= 9 && style === 1 && r.type !== 'boss' && (biome.id === 'inferno' || biome.id === 'frost' || biome.id === 'meadow' || biome.id === 'void')) { // liquid pool in the centre
+    } else if (r.w >= 9 && style === 1 && r.type !== 'boss' && (biome.id === 'inferno' || biome.id === 'frost' || biome.id === 'meadow' || biome.id === 'void')) {
       for (let z = r.cz - 1; z <= r.cz + 1; z++) for (let x = r.cx - 2; x <= r.cx + 2; x++) if (L.room[L.idx(x, z)] === r.id) L.grid[L.idx(x, z)] = T_LIQUID;
-    } else if (style === 2 && r.type !== 'boss') { // scattered pillars
+    } else if (style === 2 && r.type !== 'boss') {
       for (let k = 0; k < 5; k++) { const px = rng.int(r.x0 + 2, r.x1 - 2), pz = rng.int(r.z0 + 2, r.z1 - 2); if (L.room[L.idx(px, pz)] === r.id && Math.hypot(px - r.cx, pz - r.cz) > 2) L.grid[L.idx(px, pz)] = T_PILLAR; }
     }
     if (r.type === 'boss') {
       for (const [px, pz] of [[r.x0 + 2, r.z0 + 2], [r.x1 - 2, r.z0 + 2], [r.x0 + 2, r.z1 - 2], [r.x1 - 2, r.z1 - 2]]) L.grid[L.idx(px, pz)] = T_PILLAR;
     }
   }
-  // make sure connectivity: flood from start; any pillar/liquid fine since they are inside rooms and corridors are 3 wide
   return L;
 }
 

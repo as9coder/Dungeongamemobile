@@ -39,7 +39,7 @@ export class Engine {
     container.appendChild(r.domElement);
     r.domElement.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;touch-action:none;';
     this.scene = new THREE.Scene();
-    this.camera = new THREE.PerspectiveCamera(36, 2, 0.5, 220);
+    this.camera = new THREE.PerspectiveCamera(30, 2, 1, 260);
     this.quality = 'high'; this.resScale = 1; this.t = 0;
     this.camTarget = new THREE.Vector3(); this.camPos = new THREE.Vector3(); this.camLook = new THREE.Vector3();
     this.camYaw = -0.62; this.camDist = 1; this.camDistTarget = 1; this.shake = 0; this.shakeT = 0;
@@ -47,7 +47,7 @@ export class Engine {
     // lights
     this.hemi = new THREE.HemisphereLight(0xffffff, 0x444444, 1); this.scene.add(this.hemi);
     this.sun = new THREE.DirectionalLight(0xffffff, 1.5); this.sun.castShadow = true;
-    const sc = this.sun.shadow.camera; sc.left = -24; sc.right = 24; sc.top = 24; sc.bottom = -24; sc.near = 1; sc.far = 120;
+    const sc = this.sun.shadow.camera; sc.left = -30; sc.right = 30; sc.top = 30; sc.bottom = -30; sc.near = 1; sc.far = 120;
     this.sun.shadow.bias = -0.0008; this.sun.shadow.normalBias = 0.05;
     this.scene.add(this.sun, this.sun.target);
     this.sunDir = new THREE.Vector3(-0.5, 1, 0.5).normalize();
@@ -79,10 +79,11 @@ export class Engine {
     const r = this.renderer;
     if (this.composer) { this.composer.dispose && this.composer.dispose(); this.composer = null; }
     const size = r.getDrawingBufferSize(new THREE.Vector2());
-    if (!this.useComposer) { r.toneMapping = THREE.ACESFilmicToneMapping; r.toneMappingExposure = this.exposure || 1; return; }
+    if (!this.useComposer) { this.grade = null; this.bloom = null; this.outputPass = null; r.toneMapping = THREE.ACESFilmicToneMapping; r.toneMappingExposure = this.exposure || 1; return; }
     r.toneMapping = THREE.NoToneMapping;
     try {
-      const rt = new THREE.WebGLRenderTarget(size.x, size.y, { type: THREE.HalfFloatType, samples: this.msaa });
+      const hf = r.extensions.has('EXT_color_buffer_float') || r.extensions.has('EXT_color_buffer_half_float');
+      const rt = new THREE.WebGLRenderTarget(size.x, size.y, { type: hf ? THREE.HalfFloatType : THREE.UnsignedByteType, samples: this.msaa });
       const c = this.composer = new EffectComposer(r, rt);
       c.setPixelRatio(1); c.setSize(size.x, size.y);
       c.addPass(new RenderPass(this.scene, this.camera));
@@ -103,7 +104,7 @@ export class Engine {
     this.renderer.setPixelRatio(dpr); this.renderer.setSize(w, h, false);
     this.camera.aspect = w / h;
     // keep vertical coverage roughly constant on narrow screens
-    this.camera.fov = w / h < 1.6 ? 40 : 36; this.camera.updateProjectionMatrix();
+    this.camera.fov = w / h < 1.6 ? 34 : 30; this.camera.updateProjectionMatrix();
     if (this.composer) { const s = this.renderer.getDrawingBufferSize(new THREE.Vector2()); this.composer.setSize(s.x, s.y); if (this.bloom) this.bloom.resolution.set(s.x >> 1, s.y >> 1); }
     this.fxScaleDirty = true;
   }
@@ -130,8 +131,8 @@ export class Engine {
 
   updateCamera(dt, snap = false) {
     this.camDist = snap ? this.camDistTarget : damp(this.camDist, this.camDistTarget, 2.5, dt);
-    const d = 17.5 * this.camDist, hgt = 15 * this.camDist;
-    this.camOffset.set(Math.sin(this.camYaw) * d * 0.62, hgt, Math.cos(this.camYaw) * d * 0.62 + 0.0);
+    const hd = 18.5 * this.camDist, hgt = 25 * this.camDist;
+    this.camOffset.set(Math.sin(this.camYaw) * hd, hgt, Math.cos(this.camYaw) * hd);
     const want = this.camTarget;
     if (snap) { this.camLook.copy(want); } else { this.camLook.x = damp(this.camLook.x, want.x, 7, dt); this.camLook.z = damp(this.camLook.z, want.z, 7, dt); this.camLook.y = 0.8; }
     this.camPos.copy(this.camLook).add(this.camOffset);
@@ -150,7 +151,7 @@ export class Engine {
     // sun follows
     const tx = Math.round(this.camLook.x * 2) / 2, tz = Math.round(this.camLook.z * 2) / 2;
     this.sun.target.position.set(tx, 0, tz);
-    this.sun.position.set(tx + this.sunDir.x * 50, this.sunDir.y * 50, tz + this.sunDir.z * 50);
+    this.sun.position.set(tx + this.sunDir.x * 55, this.sunDir.y * 55, tz + this.sunDir.z * 55);
     this.sun.target.updateMatrixWorld();
     if (playerPos) {
       this.playerLight.position.set(playerPos.x, 3.2, playerPos.z);
