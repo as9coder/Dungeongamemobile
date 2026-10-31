@@ -1,0 +1,4 @@
+.toolchain
+build/
+node_modules/
+game/dist/
