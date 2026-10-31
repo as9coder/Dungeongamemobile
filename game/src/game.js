@@ -10,7 +10,7 @@ import {
 } from './data.js';
 import { A } from './audio.js';
 import { writeSave, scheduleSave, genStock } from './save.js';
-import { part, lam, emissiveMat } from './voxel.js';
+import { part, lam, emissiveMat, isSharedGeo } from './voxel.js';
 
 const _v = new THREE.Vector3();
 const BIOME_COL = { meadow: 0x4a8a30, crypt: 0x6a6a74, sands: 0xc9a560, frost: 0xa8d0f0, inferno: 0x4a2a2a, void: 0x4a3a6a, camp: 0x4a8a30 };
@@ -45,7 +45,7 @@ export class Game {
     for (const p of this.pickups) { this.scene.remove(p.mesh); }
     for (const e of this.effects) if (e.mesh) this.scene.remove(e.mesh);
     this.enemies.length = 0; this.projectiles.length = 0; this.pickups.length = 0; this.spawners.length = 0; this.beacons.length = 0; this.effects.length = 0;
-    if (this.level) { this.scene.remove(this.level.group); this.level.group.traverse((o) => { if (o.geometry && o.isMesh && !o.geometry.userData.shared) { /* geometry cache shared */ } }); }
+    if (this.level) { this.scene.remove(this.level.group); this.level.group.traverse((o) => { if (o.isInstancedMesh && o.dispose) o.dispose(); if (o.geometry && !isSharedGeo(o.geometry)) o.geometry.dispose(); }); }
     this.fx.clearAll(); this.boss = null; this.exitPortal = null; this.level = null;
   }
   buildLevel(L, biome, populate) {

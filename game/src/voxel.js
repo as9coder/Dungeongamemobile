@@ -16,6 +16,7 @@ export function boxGeo(w, h, d, pivot = 'c') {
   return g;
 }
 
+export function isSharedGeo(g) { for (const v of geoCache.values()) if (v === g) return true; for (const v of wGeoCache.values()) if (v === g) return true; return false; }
 let _cloth = null;
 export function clothTex() {
   if (_cloth) return _cloth;
